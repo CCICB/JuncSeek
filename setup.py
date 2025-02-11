@@ -1,14 +1,14 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="juncseq",                   # Package name
+    name="juncseek",                   # Package name
     version="0.1.0",                     # Initial version
     author="Patricia Sullivan",                  # Your name
     author_email="psullivan@ccia.org.au",
     description="Detect and analyze aberrant splicing events using splice junction data",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/CCICB/juncseq",  # Repository URL
+    url="https://github.com/CCICB/juncseek",  # Repository URL
     packages=find_packages(),            # Automatically find package directories
     classifiers=[                        # Metadata for PyPI
         "Programming Language :: Python :: 3",
@@ -23,7 +23,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "juncseq=juncseq:main",    # Maps 'juncseq' command to the main() function in juncseq.py
+            "juncseek=juncseek.__main__:main",
         ],
     },
 )
