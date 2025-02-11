@@ -75,16 +75,18 @@ def extract_junctions(junction_files, exon_coordinates):
 
             # Filter out low frequency junctions
             high_JAF = in_region[(in_region['JAF_start'] >= 0.05) | (in_region['JAF_end'] >= 0.05)]
+
+            high_JAF = high_JAF.copy() # Copy to avoid warning errors
             
             # Make columns int for reporting
             columns_to_convert = ["start_exonNumber", "end_exonNumber", "start_distance", "end_distance"]
             high_JAF[columns_to_convert] = high_JAF[columns_to_convert].astype(int)
             
             # Annotate junctions with splicing explanation
-            high_JAF['classification'] = classify_splicing(high_JAF)
+            high_JAF.loc[:, 'classification'] = classify_splicing(high_JAF)
 
             # Add a column with the filename (without the path and extension)
-            high_JAF["Filename"] = os.path.basename(file).replace(".hs38.SJ.out.tab", "")
+            high_JAF.loc[:, "Filename"] = os.path.basename(file).replace(".hs38.SJ.out.tab", "")
 
             # Append to the result DataFrame
             result_df = pd.concat([result_df, high_JAF])
@@ -152,9 +154,9 @@ def annotate_junctions(junctions, exons):
         n_exons = exons['exon_number'].max()
         exons['exon_number'] = n_exons + 1 - exons['exon_number']
 
-    intron_start = exons[['End', 'exon_number']]
-    intron_start['End'] += 1 # Shift to line up with junction value
-    intron_end = exons[['Start', 'exon_number']]
+    intron_start = exons[['End', 'exon_number']].copy()
+    intron_start.loc[:, 'End'] += 1  # Shift to line up with junction value
+    intron_end = exons[['Start', 'exon_number']].copy()
 
     # Rename and merge files to annotate junctions with exon number
     intron_start.columns = ['intronStart', 'start_exonNumber']
@@ -263,6 +265,8 @@ def main():
     junction_files = read_list(args.patient_list)
     print(f"Analysing junctions for {len(junction_files)} files defined in: {args.patient_list}")
     all_junctions = extract_junctions(junction_files, gene_gtf.df) # Make GTF a df
+
+    os.makedirs(args.output, exist_ok=True) # Make output folder
     all_junctions.to_csv(f"{args.output}/all_junctions.tsv", sep='\t', index=False)
 
     filtered_junctions = all_junctions[all_junctions["classification"].str.contains("Skipping", na=False)]
