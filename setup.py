@@ -16,8 +16,10 @@ setup(
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',             # Minimum Python version
-    install_requires=[                   # Dependencies for your project
-        # Add required libraries here
+    install_requires=[
+        "pyranges",
+        "pandas",
+        "numpy",
     ],
     entry_points={
         "console_scripts": [
