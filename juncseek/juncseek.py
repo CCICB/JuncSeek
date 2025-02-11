@@ -1,4 +1,4 @@
-# juncseq.py
+# juncseek.py
 import argparse
 import pyranges as pr
 import pandas as pd
@@ -73,7 +73,14 @@ def extract_junctions(junction_files, exon_coordinates):
             in_region = annotate_junctions(in_region, exon_coordinates[exon_coordinates['gene_name'] == gene['gene_name']])
             in_region['JAF_start'], in_region['JAF_end'], in_region['totalReads_start'], in_region['totalReads_end'] = calculate_JAF(in_region)
 
+            # Filter out low frequency junctions
             high_JAF = in_region[(in_region['JAF_start'] >= 0.05) | (in_region['JAF_end'] >= 0.05)]
+            
+            # Make columns int for reporting
+            columns_to_convert = ["start_exonNumber", "end_exonNumber", "start_distance", "end_distance"]
+            high_JAF[columns_to_convert] = high_JAF[columns_to_convert].astype(int)
+            
+            # Annotate junctions with splicing explanation
             high_JAF['classification'] = classify_splicing(high_JAF)
 
             # Add a column with the filename (without the path and extension)
@@ -86,6 +93,7 @@ def extract_junctions(junction_files, exon_coordinates):
         files_processed += 1
         if files_processed % 10 == 0:
             print(f"Processed {files_processed}/{len(junction_files)} junction files")
+
 
     return result_df
 
@@ -114,7 +122,6 @@ def calculate_JAF(junctions):
         if row['start_exonNumber'] == row['end_exonNumber']:
             junctions.at[index, 'end_exonNumber'] += 1
     
-    print(junctions[['start_exonNumber', 'uniqueReads']])
     exonStart_agg = (
         junctions.groupby("start_exonNumber")
         .agg(
@@ -122,7 +129,6 @@ def calculate_JAF(junctions):
         )
         .reset_index()
     )
-    print(exonStart_agg)
 
     exonEnd_agg = (
         junctions.groupby("end_exonNumber")
@@ -157,7 +163,6 @@ def annotate_junctions(junctions, exons):
     merged = junctions.merge(intron_start, on='intronStart', how='left')
     merged = merged.merge(intron_end, on='intronEnd', how='left')   
     
-    print(merged[['intronStart', 'intronEnd', 'start_exonNumber', 'end_exonNumber', 'uniqueReads']])
     # Apply the function only to rows where `start_exonNumber` is NaN
     na_mask_start = merged['start_exonNumber'].isna()
     start_distance, start_closestExonNumber = find_closest_exon(
@@ -199,7 +204,7 @@ def find_closest_exon(junction_coord, intron_coord, exon_numbers, region):
     if region == "start":
         diff = intron_coord - junction_coord[:, None] 
     else:
-        diff = junction_coord[:, None] - intron_coord
+        diff = junction_coord[:, None] - intron_coord 
 
     closest_indices = np.abs(diff).argmin(axis=1)
     signed_diffs = diff[np.arange(len(junction_coord)), closest_indices]
@@ -217,7 +222,7 @@ def classify_splicing(junctions):
             if exon_span == 1:
                 classification.append('Normal')
             else:
-                classification.append('Skipping (' + str(exon_span) + ')')
+                classification.append('Skipping (' + str(exon_span-1) + ')')
         
         # Start junction annotated
         elif junction['start_distance'] == 0:
@@ -239,7 +244,7 @@ def classify_splicing(junctions):
     return classification
 
 def main():
-    parser = argparse.ArgumentParser(description="JuncSeq: Analyze splice junctions for aberrant splicing.")
+    parser = argparse.ArgumentParser(description="JuncSeek: Analyze splice junctions for aberrant splicing.")
     parser.add_argument("--patient-list", required=True, help="Path to the file containing the list of junction files.")
     parser.add_argument("--gtf", required=True, help="Path to the gene annotation.")
     parser.add_argument("--gene-list", required=False, help="Path to the file containing the list of genes.")
@@ -259,6 +264,9 @@ def main():
     print(f"Analysing junctions for {len(junction_files)} files defined in: {args.patient_list}")
     all_junctions = extract_junctions(junction_files, gene_gtf.df) # Make GTF a df
     all_junctions.to_csv(f"{args.output}/all_junctions.tsv", sep='\t', index=False)
+
+    filtered_junctions = all_junctions[all_junctions["classification"].str.contains("Skipping", na=False)]
+    filtered_junctions.to_csv(f"{args.output}/skipping.tsv", sep='\t', index=False)
 
 if __name__ == "__main__":
     main()
