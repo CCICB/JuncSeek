@@ -1,4 +1,4 @@
-# juncseq.py
+# juncseek.py
 import argparse
 import pyranges as pr
 import pandas as pd
@@ -244,7 +244,7 @@ def classify_splicing(junctions):
     return classification
 
 def main():
-    parser = argparse.ArgumentParser(description="JuncSeq: Analyze splice junctions for aberrant splicing.")
+    parser = argparse.ArgumentParser(description="JuncSeek: Analyze splice junctions for aberrant splicing.")
     parser.add_argument("--patient-list", required=True, help="Path to the file containing the list of junction files.")
     parser.add_argument("--gtf", required=True, help="Path to the gene annotation.")
     parser.add_argument("--gene-list", required=False, help="Path to the file containing the list of genes.")

@@ -23,7 +23,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "juncseek=juncseek.__main__:main",
+            "juncseek=juncseek.juncseek:main",
         ],
-    },
+    }
 )
