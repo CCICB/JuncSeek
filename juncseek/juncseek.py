@@ -74,28 +74,32 @@ def extract_junctions(junction_files, exon_coordinates):
             in_region['JAF_start'], in_region['JAF_end'], in_region['totalReads_start'], in_region['totalReads_end'] = calculate_JAF(in_region)
 
             # Filter out low frequency junctions
-            high_JAF = in_region[(in_region['JAF_start'] >= 0.05) | (in_region['JAF_end'] >= 0.05)]
-
-            high_JAF = high_JAF.copy() # Copy to avoid warning errors
+            # TODO: add JAF filter input
+            #high_JAF = in_region[(in_region['JAF_start'] >= 0.05) | (in_region['JAF_end'] >= 0.05)]
+            #high_JAF = high_JAF.copy() # Copy to avoid warning errors
             
-            # Make columns int for reporting
-            columns_to_convert = ["start_exonNumber", "end_exonNumber", "start_distance", "end_distance"]
-            high_JAF[columns_to_convert] = high_JAF[columns_to_convert].astype(int)
-            
-            # Annotate junctions with splicing explanation
-            high_JAF.loc[:, 'classification'] = classify_splicing(high_JAF)
+            if len(in_region):
+                high_JAF = in_region.copy() # Skip JAF filtering
+                
+                # Make columns int for reporting
+                columns_to_convert = ["start_exonNumber", "end_exonNumber", "start_distance", "end_distance"]
+                high_JAF[columns_to_convert] = high_JAF[columns_to_convert].astype(int)
+                
+                print(high_JAF)
 
-            # Add a column with the filename (without the path and extension)
-            high_JAF.loc[:, "Filename"] = os.path.basename(file).replace(".hs38.SJ.out.tab", "")
+                # Annotate junctions with splicing explanation
+                high_JAF.loc[:, 'classification'] = classify_splicing(high_JAF)
 
-            # Append to the result DataFrame
-            result_df = pd.concat([result_df, high_JAF])
+                # Add a column with the filename (without the path and extension)
+                high_JAF.loc[:, "Filename"] = os.path.basename(file).replace(".hs38.SJ.out.tab", "")
+
+                # Append to the result DataFrame
+                result_df = pd.concat([result_df, high_JAF])
 
         # Reporting log
         files_processed += 1
         if files_processed % 10 == 0:
             print(f"Processed {files_processed}/{len(junction_files)} junction files")
-
 
     return result_df
 
@@ -118,6 +122,8 @@ def filter_junctions(junctions, gene):
     ]
     return filtered
 
+# TODO: determine correct way to calculate JAF
+# Current issue with alternative junctions 
 def calculate_JAF(junctions):
     # Don't allow for the start and end junctions to be the same (for JAF)
     for index, row in junctions.iterrows():
@@ -149,10 +155,6 @@ def calculate_JAF(junctions):
 
 def annotate_junctions(junctions, exons): 
     exons['exon_number'] = exons['exon_number'].astype(int)   
-    if exons['Strand'].values[0] == "-":
-        # Reverse exon_number labelling 
-        n_exons = exons['exon_number'].max()
-        exons['exon_number'] = n_exons + 1 - exons['exon_number']
 
     intron_start = exons[['End', 'exon_number']].copy()
     intron_start.loc[:, 'End'] += 1  # Shift to line up with junction value
@@ -220,7 +222,7 @@ def classify_splicing(junctions):
         # Both junctions annotated
         if junction['start_distance'] == 0 and junction['end_distance'] == 0: 
             # Sequential exons
-            exon_span = junction['end_exonNumber'] - junction['start_exonNumber']
+            exon_span = abs(junction['end_exonNumber'] - junction['start_exonNumber'])
             if exon_span == 1:
                 classification.append('Normal')
             else:
@@ -252,25 +254,29 @@ def main():
     parser.add_argument("--gene-list", required=False, help="Path to the file containing the list of genes.")
     parser.add_argument("--vcf", required=False, help="Path to the VCF file containing variants.")
     parser.add_argument("--output", required=True, help="Path to the output directory.")
+    # TODO: Add filter options as an argument
 
     args = parser.parse_args()
 
-    # Your processing logic here
+    ### Get gene list
     print(f"Analyzing gene list: {args.gene_list}")
     genes = pd.read_csv(args.gene_list)
 
+    ### Get gene information from gtf
     print(f"Using gene annotation defined by: {args.gtf}")
     gene_gtf = subset_gtf(args.gtf, genes)
     
+    ### Extract junctions
     junction_files = read_list(args.patient_list)
     print(f"Analysing junctions for {len(junction_files)} files defined in: {args.patient_list}")
     all_junctions = extract_junctions(junction_files, gene_gtf.df) # Make GTF a df
 
+    ### TODO: Add filter steps
+
+    ### Save
     os.makedirs(args.output, exist_ok=True) # Make output folder
     all_junctions.to_csv(f"{args.output}/all_junctions.tsv", sep='\t', index=False)
-
-    filtered_junctions = all_junctions[all_junctions["classification"].str.contains("Skipping", na=False)]
-    filtered_junctions.to_csv(f"{args.output}/skipping.tsv", sep='\t', index=False)
+    all_junctions = pd.read_csv(f"{args.output}/all_junctions.tsv", sep='\t')
 
 if __name__ == "__main__":
     main()
